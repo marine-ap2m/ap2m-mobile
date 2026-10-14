@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "AP2M · Tâche",
+  "short_name": "Tâche AP2M",
+  "description": "Ajouter une tâche dans la tour de contrôle AP2M.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F2EE",
+  "theme_color": "#5E0B16",
+  "lang": "fr",
+  "icons": [
+    { "src": "../icones/tache-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "../icones/tache-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "../icones/tache-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
