@@ -309,7 +309,7 @@ async function lireAuto(){
       return r.ok ? r.json() : null;
     })(),
     sb.rpc('tour_retours_memoire'),
-    window.PRTECH ? window.PRTECH.lire() : Promise.reject(new Error('prtech')),
+    window.PRTECH ? window.PRTECH.lire(sb) : Promise.reject(new Error('prtech')),
   ]);
   if (prtech.status === 'fulfilled'){ etats.prtech = prtech.value; for (const t of prtech.value.taches) liste.push(t); }
   if (memoire.status === 'fulfilled' && !memoire.value.error && memoire.value.data) etats.memoire = memoire.value.data;
