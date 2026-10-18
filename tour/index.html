@@ -46,6 +46,8 @@ button,input{font:inherit;color:inherit}
 .outils{display:grid;grid-template-columns:repeat(5,1fr);gap:10px 2px;padding:4px 0 12px;border-bottom:1px solid var(--bordure);margin-bottom:10px}
 .om{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;border:0;background:none;padding:0;cursor:pointer;font-size:10.5px;font-weight:700;line-height:1.15;text-align:center;color:var(--encre);text-decoration:none}
 .om i{width:46px;height:46px;border-radius:14px;background:var(--c);display:grid;place-items:center;box-shadow:0 2px 6px rgba(35,37,31,.12)}
+.om i.logo-i{background:#fff;border:1px solid var(--bordure);overflow:hidden}
+.om i img{width:100%;height:100%;object-fit:contain}
 .om svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .om em{position:absolute;top:-5px;left:calc(50% + 10px);min-width:19px;height:19px;border-radius:999px;background:var(--rouge);color:#fff;font-style:normal;font-size:10.5px;font-weight:800;display:grid;place-items:center;padding:0 4px;border:2px solid var(--page)}
 .om:active i{transform:scale(.94)}
@@ -186,6 +188,7 @@ dialog::backdrop{background:rgba(35,37,31,.45)}
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="https://marine-ap2m.github.io/tour-de-controle/prtech-taches.js"></script>
 <script>
 /* Même projet et même clé publiable que la tour du PC : la connexion et les données sont partagées. */
 const SUPABASE_URL = "https://zhgqqaedtmeowpjadtqr.supabase.co";
@@ -279,7 +282,7 @@ async function lire(){
 }
 
 /* ---------- Ce qui vient des outils : tâches automatiques et macarons (mêmes règles que le PC) ---------- */
-let AUTO = [], ETATS = { depot:null, attest:null, veille:null, memoire:null };
+let AUTO = [], ETATS = { depot:null, attest:null, veille:null, memoire:null, prtech:null };
 const CATALOGUE = [['urssaf','URSSAF',0],['fiscale','Régularité fiscale',0],['conges','CIBTP',0],['probtp','PRO BTP',0],['rcpro','RC Pro',0],['decennale','Décennale',0],['kbis','Kbis',0],['rib','RIB',0],['identite','Identité et cartes BTP',0],['etrangers','Salariés étrangers',1],['habilitations','Habilitations',1],['rge','RGE',1]];
 const SEUIL_JOURS = 45;
 function statutPiece(d, conditionnelle){
@@ -297,7 +300,7 @@ const clientDe = (...noms) => { for (const n of noms){ const x = norme(n); if (!
 
 async function lireAuto(){
   const liste = [], etats = { ...ETATS };
-  const [dep, att, veille, memoire] = await Promise.allSettled([
+  const [dep, att, veille, memoire, prtech] = await Promise.allSettled([
     sb.rpc('cockpit_compteurs_depot'),
     sb.from('ap2m_attestations').select('id, data'),
     (async () => {
@@ -306,7 +309,9 @@ async function lireAuto(){
       return r.ok ? r.json() : null;
     })(),
     sb.rpc('tour_retours_memoire'),
+    window.PRTECH ? window.PRTECH.lire() : Promise.reject(new Error('prtech')),
   ]);
+  if (prtech.status === 'fulfilled'){ etats.prtech = prtech.value; for (const t of prtech.value.taches) liste.push(t); }
   if (memoire.status === 'fulfilled' && !memoire.value.error && memoire.value.data) etats.memoire = memoire.value.data;
   if (dep.status === 'fulfilled' && !dep.value.error){
     let aTraiter = 0, enAttenteN = 0;
@@ -393,6 +398,7 @@ const ICO = {
 const OUTILS = [
   { cle:'depot',    nom:'Dépôt',         ic:'depot',    c:'#2F6B5E', url: URL_DEPOT },
   { cle:'attest',   nom:'Attestations',  ic:'bouclier', c:'#9A3B4A', url: URL_ATTESTATIONS },
+  { cle:'prtech',   nom:'PRTECH',        img: GH + 'tour-de-controle/logos/prtech.png', c:'#fff', url: GH + 'prtech-pointage/' },
   { cle:'veille',   nom:'Veille AO',     ic:'veille',   c:'#6B4C8A', url: URL_VEILLE },
   { cle:'valid',    nom:'Validation AO', ic:'valid',    c:'#3C5A82', url: URL_VEILLE },
   { cle:'memoire',  nom:'Mémoires',      ic:'memoire',  c:'#7A4E8C', url:'https://ap2m-validation-memoire-technique.vercel.app/admin' },
@@ -406,6 +412,7 @@ const OUTILS = [
 function pastille(o){
   if (o.cle === 'depot') return ETATS.depot && ETATS.depot.aTraiter;
   if (o.cle === 'attest') return ETATS.attest && ETATS.attest.aRegul;
+  if (o.cle === 'prtech'){ const e = ETATS.prtech; if (!e || !e.relie) return 0; const k = e.compte; return k.fact + k.av + k.rel + k.devis; }
   if (o.cle === 'veille') return ETATS.veille && ETATS.veille.aTraiter;
   if (o.cle === 'valid') return ETATS.veille && ETATS.veille.retours;
   if (o.cle === 'memoire') return ETATS.memoire && Number(ETATS.memoire.retours || 0);
@@ -415,7 +422,7 @@ function pastille(o){
 function afficherOutils(){
   $('#outils').innerHTML = OUTILS.map(o => {
     const n = pastille(o);
-    const dedans = `<i style="--c:${o.c}"><svg viewBox="0 0 24 24">${ICO[o.ic]}</svg></i>${esc(o.nom)}${n ? `<em>${n}</em>` : ''}`;
+    const dedans = `<i style="--c:${o.c}"${o.img ? ' class="logo-i"' : ''}>${o.img ? `<img src="${o.img}" alt="">` : `<svg viewBox="0 0 24 24">${ICO[o.ic]}</svg>`}</i>${esc(o.nom)}${n ? `<em>${n}</em>` : ''}`;
     if (o.vue) return `<button class="om" type="button" data-vue="${o.vue}">${dedans}</button>`;
     if (o.plat) return `<button class="om" type="button" data-plat="1">${dedans}</button>`;
     return `<a class="om" href="${o.url}"${/^https?:/.test(o.url) ? ' target="_blank" rel="noopener"' : ''}>${dedans}</a>`;
@@ -434,7 +441,7 @@ const ordre = (a, b) => (b.p - a.p) || ((a.ech || '9999') < (b.ech || '9999') ? 
 function ligne(t){
   const fini = t.col === 'fait', e = echeance(t);
   const pr = fini ? '' : t.p === 2 ? '<span class="pr u">Urgent</span>' : t.p === 1 ? '<span class="pr i">Important</span>' : '';
-  const info = fini ? '' : e ? `<small class="${e[1]}">${esc(e[0])}</small>` : t.src ? `<small>${esc(t.src)}</small>` : t.reporteeDe ? `<small>Reportée de S${esc(t.reporteeDe)}</small>` : '';
+  const info = fini ? '' : e ? `<small class="${e[1]}">${esc(e[0])}</small>` : t.info ? `<small class="${t.info[1]}">${esc(t.info[0])}</small>` : t.src ? `<small>${esc(t.src)}</small>` : t.reporteeDe ? `<small>Reportée de S${esc(t.reporteeDe)}</small>` : '';
   const etapes = t.et && t.et.length ? ` · ${t.et.filter(x => x[1]).length}/${t.et.length}` : '';
   return `<div class="t${fini ? ' faite' : t.auto === 'ao' ? ' depot' : t.p === 2 ? ' urg' : t.p === 1 ? ' imp' : ''}" data-id="${esc(t.id)}" role="button" tabindex="0">
     <div><div class="l1"><span class="cl">${esc(t.c)}</span>${t.auto ? '<span class="auto">Auto</span>' : ''}${pr}</div><b>${esc(t.t)}${etapes}</b>${info}</div>
@@ -575,7 +582,7 @@ function montrer(connecte){
   $('#connexion').hidden = connecte; $('#app').hidden = !connecte; $('#synchro').hidden = !connecte;
   clearInterval(minuteur);
   if (connecte){ afficherOutils(); charger(); minuteur = setInterval(charger, 2 * 60000); }
-  else { DOC = { taches: [], auto: {}, jours: {}, seq: 1 }; VERSION = null; charge = false; AUTO = []; ETATS = { depot:null, attest:null, veille:null, memoire:null }; }
+  else { DOC = { taches: [], auto: {}, jours: {}, seq: 1 }; VERSION = null; charge = false; AUTO = []; ETATS = { depot:null, attest:null, veille:null, memoire:null, prtech:null }; }
 }
 /* Quand on revient sur l'appli, on relit : ce qui a été fait sur le PC apparaît tout de suite. */
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !$('#app').hidden && !$('#fiche').open) charger(); });
