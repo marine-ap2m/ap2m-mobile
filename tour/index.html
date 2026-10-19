@@ -364,15 +364,18 @@ async function lireAuto(){
   }
   AUTO = liste; ETATS = etats;
 }
+/* Une tâche auto « supprimée » reste cachée tant que la situation est la même ; elle revient si elle change. */
+const signature = a => 'masque:' + (a.cleMasque || a.t + '|' + (a.info ? a.info[0] : '') + '|' + (a.ech || ''));
 function colonneAuto(a){
   const choisie = DOC.auto[a.id];
+  if (typeof choisie === 'string' && choisie.startsWith('masque:')) return choisie === signature(a) ? 'masque' : a.colDefaut;
   if (a.auto === 'ao' && a.p === 2) return 'auj';
   return choisie && choisie !== 'fait' ? choisie : a.colDefaut;
 }
 function toutes(){
   const limite = new Date(aujourdhui() - 7 * 86400000);
   const miennes = DOC.taches.filter(t => t.col !== 'fait' || !t.faiteLe || deIso(t.faiteLe) >= limite);
-  return miennes.concat(AUTO.map(a => ({ ...a, col: colonneAuto(a) })));
+  return miennes.concat(AUTO.map(a => ({ ...a, col: colonneAuto(a) })).filter(a => a.col !== 'masque'));
 }
 function jourDe(t){
   if (t.auto === 'ao') return null;
@@ -543,7 +546,7 @@ function ouvrir(id){
       ${t.col === 'auj' ? '<button data-a="semaine">Cette semaine</button>' : ''}
       ${t.col !== 'plus' && t.col !== 'fait' ? '<button data-a="plus">Plus tard</button>' : ''}
       ${!t.auto && t.col !== 'attente' && t.col !== 'fait' ? '<button data-a="attente">En attente client</button>' : ''}
-      ${t.auto ? '' : `<button data-a="prio">${t.p === 2 ? 'Enlever « urgent »' : 'Passer en urgent'}</button><button class="danger" data-a="supprimer">Supprimer</button>`}
+      ${t.auto ? '<button class="danger" data-a="masquer">Supprimer</button>' : `<button data-a="prio">${t.p === 2 ? 'Enlever « urgent »' : 'Passer en urgent'}</button><button class="danger" data-a="supprimer">Supprimer</button>`}
     </div>`;
   if (!$('#fiche').open) $('#fiche').showModal();
 }
@@ -553,6 +556,11 @@ $('#fiche').addEventListener('click', e => {
   const t = trouver(ouverte), act = a.dataset.a;
   if (act === 'fermer' || !t) return $('#fiche').close();
   if (act === 'prio'){ t.p = t.p === 2 ? 0 : 2; modifier(); return ouvrir(ouverte); }
+  if (act === 'masquer'){
+    if (!a.classList.contains('sur')){ a.classList.add('sur'); a.textContent = 'Confirmer la suppression'; return; }
+    DOC.auto[t.id] = signature(t); delete DOC.jours[t.id]; $('#fiche').close(); modifier();
+    return toast('Tâche supprimée. Elle reviendra seulement si la situation change.');
+  }
   if (act === 'supprimer'){
     if (!a.classList.contains('sur')){ a.classList.add('sur'); a.textContent = 'Confirmer'; return; }
     DOC.taches = DOC.taches.filter(x => x.id !== t.id); $('#fiche').close(); modifier(); return toast('Tâche supprimée');
